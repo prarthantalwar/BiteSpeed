@@ -65,7 +65,28 @@ class ContactService:
                     )
                 secondary_contacts.append(contact)
 
+        # Update the primary contact's linkedId in memory
+        for secondary_contact in secondary_contacts:
+            secondary_contact["linkedId"] = primary_contact["id"]
+
+        # Update the primary contact's linkedId in the database
+        self.update_primary_linked_id(primary_contact["id"], secondary_contacts)
+
         return primary_contact, secondary_contacts
+
+    def update_primary_linked_id(self, primary_contact_id, secondary_contacts):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            for secondary_contact in secondary_contacts:
+                query = "UPDATE Contact SET linkedId = %s WHERE id = %s"
+                cursor.execute(query, (primary_contact_id, secondary_contact["id"]))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            logging.error(f"Error updating primary linkedId: {e}")
+            raise
 
     def update_contact_to_secondary(self, contact_id, primary_contact_id):
         try:
