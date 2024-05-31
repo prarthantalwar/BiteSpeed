@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from services import ContactService
+from models import create_tables
 
 app = Flask(__name__)
 contact_service = ContactService()
+create_tables()
 
 
 @app.route("/identify", methods=["POST"])
