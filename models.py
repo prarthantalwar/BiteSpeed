@@ -15,13 +15,11 @@ def create_tables():
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             deletedAt TIMESTAMP NULL DEFAULT NULL,
-            UNIQUE KEY unique_email_phone (email, phoneNumber)
+            UNIQUE KEY unique_email (email),
+            UNIQUE KEY unique_phoneNumber (phoneNumber)
         )
     """
     )
     conn.commit()
     cursor.close()
     conn.close()
-
-
-create_tables()

@@ -6,14 +6,16 @@ class ContactService:
     def identify_contact(self, email=None, phoneNumber=None):
         try:
             conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)  # Using dictionary cursor
+            cursor = conn.cursor(dictionary=True)
 
             query = "SELECT * FROM Contact WHERE email = %s OR phoneNumber = %s"
             cursor.execute(query, (email, phoneNumber))
-            contacts = cursor.fetchall()  # Fetches result as a list of dictionaries
+            contacts = cursor.fetchall()
 
             if contacts:
-                primary_contact, secondary_contacts = self.merge_contacts(contacts)
+                primary_contact, secondary_contacts = self.merge_contacts(
+                    contacts, email, phoneNumber
+                )
                 response = self.build_response(primary_contact, secondary_contacts)
             else:
                 primary_contact = self.create_primary_contact(email, phoneNumber)
@@ -30,12 +32,12 @@ class ContactService:
     def create_primary_contact(self, email, phoneNumber):
         try:
             conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)  # Using dictionary cursor
-            query = "INSERT INTO Contact (email, phoneNumber, linkPrecedence) VALUES (%s, %s, 'primary')"
+            cursor = conn.cursor(dictionary=True)
+            query = "INSERT INTO Contact (email, phoneNumber, linkPrecedence, createdAt, updatedAt) VALUES (%s, %s, 'primary', NOW(), NOW())"
             cursor.execute(query, (email, phoneNumber))
             conn.commit()
             cursor.execute("SELECT * FROM Contact WHERE id = %s", (cursor.lastrowid,))
-            primary_contact = cursor.fetchone()  # Fetches result as a dictionary
+            primary_contact = cursor.fetchone()
             cursor.close()
             conn.close()
         except Exception as e:
@@ -44,7 +46,7 @@ class ContactService:
 
         return primary_contact
 
-    def merge_contacts(self, contacts):
+    def merge_contacts(self, contacts, email, phoneNumber):
         primary_contact = None
 
         for contact in contacts:
@@ -65,13 +67,43 @@ class ContactService:
                     )
                 secondary_contacts.append(contact)
 
+        if email and primary_contact["email"] != email:
+            new_secondary = self.create_secondary_contact(
+                email, phoneNumber, primary_contact["id"]
+            )
+            secondary_contacts.append(new_secondary)
+
+        if phoneNumber and primary_contact["phoneNumber"] != phoneNumber:
+            if not any(c["phoneNumber"] == phoneNumber for c in secondary_contacts):
+                new_secondary = self.create_secondary_contact(
+                    email, phoneNumber, primary_contact["id"]
+                )
+                secondary_contacts.append(new_secondary)
+
         return primary_contact, secondary_contacts
+
+    def create_secondary_contact(self, email, phoneNumber, primary_contact_id):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            query = "INSERT INTO Contact (email, phoneNumber, linkPrecedence, linkedId, createdAt, updatedAt) VALUES (%s, %s, 'secondary', %s, NOW(), NOW())"
+            cursor.execute(query, (email, phoneNumber, primary_contact_id))
+            conn.commit()
+            cursor.execute("SELECT * FROM Contact WHERE id = %s", (cursor.lastrowid,))
+            secondary_contact = cursor.fetchone()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            logging.error(f"Error creating secondary contact: {e}")
+            raise
+
+        return secondary_contact
 
     def update_contact_to_secondary(self, contact_id, primary_contact_id):
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            query = "UPDATE Contact SET linkPrecedence = 'secondary', linkedId = %s WHERE id = %s"
+            query = "UPDATE Contact SET linkPrecedence = 'secondary', linkedId = %s, updatedAt = NOW() WHERE id = %s"
             cursor.execute(query, (primary_contact_id, contact_id))
             conn.commit()
             cursor.close()
