@@ -21,6 +21,3 @@ def create_tables():
     conn.commit()
     cursor.close()
     conn.close()
-
-
-create_tables()

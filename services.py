@@ -6,11 +6,11 @@ class ContactService:
     def identify_contact(self, email=None, phoneNumber=None):
         try:
             conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)  # Using dictionary cursor
+            cursor = conn.cursor(dictionary=True)
 
             query = "SELECT * FROM Contact WHERE email = %s OR phoneNumber = %s"
             cursor.execute(query, (email, phoneNumber))
-            contacts = cursor.fetchall()  # Fetches result as a list of dictionaries
+            contacts = cursor.fetchall()
 
             if contacts:
                 primary_contact, secondary_contacts = self.merge_contacts(contacts)
@@ -30,12 +30,14 @@ class ContactService:
     def create_primary_contact(self, email, phoneNumber):
         try:
             conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)  # Using dictionary cursor
+            cursor = conn.cursor(dictionary=True)
+
             query = "INSERT INTO Contact (email, phoneNumber, linkPrecedence) VALUES (%s, %s, 'primary')"
             cursor.execute(query, (email, phoneNumber))
             conn.commit()
+
             cursor.execute("SELECT * FROM Contact WHERE id = %s", (cursor.lastrowid,))
-            primary_contact = cursor.fetchone()  # Fetches result as a dictionary
+            primary_contact = cursor.fetchone()
             cursor.close()
             conn.close()
         except Exception as e:
@@ -46,55 +48,36 @@ class ContactService:
 
     def merge_contacts(self, contacts):
         primary_contact = None
+        secondary_contacts = []
 
         for contact in contacts:
             if contact["linkPrecedence"] == "primary":
                 primary_contact = contact
-                break
+            else:
+                secondary_contacts.append(contact)
 
         if not primary_contact:
             primary_contact = contacts[0]
             primary_contact["linkPrecedence"] = "primary"
+            secondary_contacts = contacts[1:]
 
-        secondary_contacts = []
-        for contact in contacts:
-            if contact["id"] != primary_contact["id"]:
-                if contact["linkPrecedence"] == "primary":
-                    self.update_contact_to_secondary(
-                        contact["id"], primary_contact["id"]
-                    )
-                secondary_contacts.append(contact)
-
-        # Update the primary contact's linkedId in memory
+        # Update secondary contacts to link to primary contact
         for secondary_contact in secondary_contacts:
-            secondary_contact["linkedId"] = primary_contact["id"]
-
-        # Update the primary contact's linkedId in the database
-        self.update_primary_linked_id(primary_contact["id"], secondary_contacts)
+            self.update_contact_to_secondary(
+                secondary_contact["id"], primary_contact["id"]
+            )
 
         return primary_contact, secondary_contacts
-
-    def update_primary_linked_id(self, primary_contact_id, secondary_contacts):
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            for secondary_contact in secondary_contacts:
-                query = "UPDATE Contact SET linkedId = %s WHERE id = %s"
-                cursor.execute(query, (primary_contact_id, secondary_contact["id"]))
-            conn.commit()
-            cursor.close()
-            conn.close()
-        except Exception as e:
-            logging.error(f"Error updating primary linkedId: {e}")
-            raise
 
     def update_contact_to_secondary(self, contact_id, primary_contact_id):
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
+
             query = "UPDATE Contact SET linkPrecedence = 'secondary', linkedId = %s WHERE id = %s"
             cursor.execute(query, (primary_contact_id, contact_id))
             conn.commit()
+
             cursor.close()
             conn.close()
         except Exception as e:
