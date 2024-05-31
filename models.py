@@ -14,12 +14,13 @@ def create_tables():
             linkPrecedence ENUM('primary', 'secondary') NOT NULL,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            deletedAt TIMESTAMP NULL DEFAULT NULL,
-            UNIQUE KEY unique_email (email),
-            UNIQUE KEY unique_phoneNumber (phoneNumber)
+            deletedAt TIMESTAMP NULL DEFAULT NULL
         )
-    """
+        """
     )
     conn.commit()
     cursor.close()
     conn.close()
+
+
+create_tables()
