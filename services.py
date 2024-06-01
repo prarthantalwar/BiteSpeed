@@ -2,6 +2,13 @@ from collections import OrderedDict
 from config import get_db_connection
 import logging
 
+# Configuring logging for debug
+logging.basicConfig(
+    filename="app.log",
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
 
 class ContactService:
     def identify_contact(self, email=None, phoneNumber=None):
@@ -19,26 +26,28 @@ class ContactService:
             cursor.execute(query, (email, phoneNumber))
             contacts = cursor.fetchall()
 
-            print("\n\nFetched contacts from the database:", contacts)
+            logging.debug("Fetched contacts from the database: %s", contacts)
 
             new_contact = {"email": email, "phoneNumber": phoneNumber}
             if contacts:
                 # Merge existing contacts if found
-                print("\n\nMerging existing contacts")
+                logging.debug("Merging existing contacts")
                 primary_contact, secondary_contacts = self.merge_contacts(
                     contacts, new_contact
                 )
                 response = self.build_response(primary_contact, secondary_contacts)
             else:
                 # Create new primary contact if no existing contacts found
-                print("\n\nNo existing contacts found, creating new primary contact")
+                logging.debug(
+                    "No existing contacts found, creating new primary contact"
+                )
                 primary_contact = self.create_primary_contact(email, phoneNumber)
                 response = self.build_response(primary_contact, [])
             cursor.close()
             conn.close()
 
         except Exception as e:
-            logging.error(f"Error identifying contact: {e}")
+            logging.error("Error identifying contact: %s", e)
             raise
 
         return response
@@ -48,7 +57,7 @@ class ContactService:
         Create a new primary contact in the database.
         """
         try:
-            print("\n\nCreating primary contact in the database")
+            logging.debug("Creating primary contact in the database")
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
 
@@ -63,9 +72,9 @@ class ContactService:
             cursor.close()
             conn.close()
 
-            print("\n\nPrimary contact created successfully:", primary_contact)
+            logging.debug("Primary contact created successfully: %s", primary_contact)
         except Exception as e:
-            logging.error(f"Error creating primary contact: {e}")
+            logging.error("Error creating primary contact: %s", e)
             raise
 
         return primary_contact
@@ -74,7 +83,7 @@ class ContactService:
         """
         Merge existing contacts and link them appropriately.
         """
-        print("\n\nMerging existing contacts")
+        logging.debug("Merging existing contacts")
 
         # Count the number of primary contacts
         num_primary = sum(
@@ -82,8 +91,8 @@ class ContactService:
         )
 
         if num_primary > 1:
-            print(
-                "\n\n\nHave to convert some primary to secondary as more than 1 primary contact"
+            logging.debug(
+                "Have to convert some primary to secondary as more than 1 primary contact"
             )
             primary_contacts = [
                 contact
@@ -107,7 +116,7 @@ class ContactService:
                     secondary_contacts.append(contact)
 
         else:
-            print("\n\n\nMerging as only 1 primary contact")
+            logging.debug("Merging as only 1 primary contact")
             secondary_contacts = []
 
             for contact in contacts:
@@ -130,7 +139,7 @@ class ContactService:
         Update a contact to secondary and link it to the primary contact.
         """
         try:
-            print("\n\nUpdating contact to secondary in the database:", contact)
+            logging.debug("Updating contact to secondary in the database: %s", contact)
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
 
@@ -141,9 +150,9 @@ class ContactService:
             cursor.close()
             conn.close()
 
-            print("\n\nContact updated to secondary successfully:", contact)
+            logging.debug("Contact updated to secondary successfully: %s", contact)
         except Exception as e:
-            logging.error(f"Error updating contact to secondary: {e}")
+            logging.error("Error updating contact to secondary: %s", e)
             raise
 
     def add_new_contact_to_database(self, new_contact, linkedId):
@@ -151,11 +160,10 @@ class ContactService:
         Add a new contact to the database as a secondary contact linked to the primary.
         """
         try:
-            print(
-                "\n\nAdding new contact to database",
-                new_contact,
-                "with linkedId of",
+            logging.debug(
+                "Adding new contact to database with linkedId of %s: %s",
                 linkedId,
+                new_contact,
             )
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
@@ -170,22 +178,22 @@ class ContactService:
                     linkedId,
                 ),
             )
-            print("\n\nQuery for adding new contact data to database:", query)
+            logging.debug("Query for adding new contact data to database: %s", query)
             conn.commit()
 
-            print("\n\nNew contact added to the database successfully")
+            logging.debug("New contact added to the database successfully")
 
             # Retrieve the data to display as secondary
             cursor.execute("SELECT * FROM Contact WHERE id = %s", (cursor.lastrowid,))
             secondary = cursor.fetchone()
 
-            print("\n\nNew contact data:", secondary)
+            logging.debug("New contact data: %s", secondary)
             cursor.close()
             conn.close()
 
             return secondary
         except Exception as e:
-            logging.error(f"Error adding new contact to database: {e}")
+            logging.error("Error adding new contact to database: %s", e)
             raise
 
     def build_response(self, primary_contact, secondary_contacts):
@@ -193,13 +201,11 @@ class ContactService:
         Build the response structure with primary and secondary contacts.
         """
         try:
-            print("\n\nBuilding response")
-            print(
-                "\n\n\nPrimarycontact:",
+            logging.debug("Building response")
+            logging.debug(
+                "Primary contact: %s, Secondary contacts: %s",
                 primary_contact,
-                "secondary contact:",
                 secondary_contacts,
-                "\n\n\n",
             )
             response = {
                 "contact": {
@@ -228,9 +234,9 @@ class ContactService:
                 }
             }
 
-            print("\n\nResponse built:", response)
+            logging.debug("Response built: %s", response)
         except Exception as e:
-            logging.error(f"Error building response: {e}")
+            logging.error("Error building response: %s", e)
             raise
 
         return response
