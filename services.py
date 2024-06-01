@@ -5,10 +5,16 @@ import logging
 
 class ContactService:
     def identify_contact(self, email=None, phoneNumber=None):
+        """
+        Identify a contact based on email and/or phone number.
+        If contact exists, merge the contacts. If not, create a new primary contact.
+        """
         try:
+            # Establish database connection
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
 
+            # Query to fetch contacts based on email or phone number
             query = "SELECT * FROM Contact WHERE email = %s OR phoneNumber = %s"
             cursor.execute(query, (email, phoneNumber))
             contacts = cursor.fetchall()
@@ -17,11 +23,14 @@ class ContactService:
 
             new_contact = {"email": email, "phoneNumber": phoneNumber}
             if contacts:
+                # Merge existing contacts if found
+                print("\n\nMerging existing contacts")
                 primary_contact, secondary_contacts = self.merge_contacts(
                     contacts, new_contact
                 )
                 response = self.build_response(primary_contact, secondary_contacts)
             else:
+                # Create new primary contact if no existing contacts found
                 print("\n\nNo existing contacts found, creating new primary contact")
                 primary_contact = self.create_primary_contact(email, phoneNumber)
                 response = self.build_response(primary_contact, [])
@@ -35,15 +44,20 @@ class ContactService:
         return response
 
     def create_primary_contact(self, email, phoneNumber):
+        """
+        Create a new primary contact in the database.
+        """
         try:
             print("\n\nCreating primary contact in the database")
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
 
+            # Insert new primary contact
             query = "INSERT INTO Contact (email, phoneNumber, linkPrecedence) VALUES (%s, %s, 'primary')"
             cursor.execute(query, (email, phoneNumber))
             conn.commit()
 
+            # Fetch the newly created contact
             cursor.execute("SELECT * FROM Contact WHERE id = %s", (cursor.lastrowid,))
             primary_contact = cursor.fetchone()
             cursor.close()
@@ -57,8 +71,12 @@ class ContactService:
         return primary_contact
 
     def merge_contacts(self, contacts, new_contact):
+        """
+        Merge existing contacts and link them appropriately.
+        """
         print("\n\nMerging existing contacts")
 
+        # Count the number of primary contacts
         num_primary = sum(
             1 for contact in contacts if contact.get("linkPrecedence") == "primary"
         )
@@ -88,14 +106,8 @@ class ContactService:
                     self.update_contact_to_secondary(contact, id_for_link)
                     secondary_contacts.append(contact)
 
-            # Add new contact to database
-            # new_secondary_contact = self.add_new_contact_to_database(new_contact, id_for_link)
-            # secondary_contacts.append(new_secondary_contact)
-
         else:
             print("\n\n\nMerging as only 1 primary contact")
-            # primary_contact = None
-            id_for_link = 0
             secondary_contacts = []
 
             for contact in contacts:
@@ -114,6 +126,9 @@ class ContactService:
         return primary_contact, secondary_contacts
 
     def update_contact_to_secondary(self, contact, linkedId):
+        """
+        Update a contact to secondary and link it to the primary contact.
+        """
         try:
             print("\n\nUpdating contact to secondary in the database:", contact)
             conn = get_db_connection()
@@ -132,6 +147,9 @@ class ContactService:
             raise
 
     def add_new_contact_to_database(self, new_contact, linkedId):
+        """
+        Add a new contact to the database as a secondary contact linked to the primary.
+        """
         try:
             print(
                 "\n\nAdding new contact to database",
@@ -141,6 +159,7 @@ class ContactService:
             )
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
+
             query = "INSERT INTO Contact (email, phoneNumber, linkPrecedence, linkedId) VALUES (%s, %s, %s, %s)"
             cursor.execute(
                 query,
@@ -163,12 +182,16 @@ class ContactService:
             print("\n\nNew contact data:", secondary)
             cursor.close()
             conn.close()
+
             return secondary
         except Exception as e:
             logging.error(f"Error adding new contact to database: {e}")
             raise
 
     def build_response(self, primary_contact, secondary_contacts):
+        """
+        Build the response structure with primary and secondary contacts.
+        """
         try:
             print("\n\nBuilding response")
             print(
